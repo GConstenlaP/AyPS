@@ -92,11 +92,13 @@ graficar_primer_ciclo(tt, xx, f0, 'Primer ciclo de Señal 1')
 #transformada de senial 1
 fft_1= scipy.fft.fft(xx)
 
-#acoto FFt y frec.
-modulo_1 = np.abs(fft_1[:N//2])
+modulo_1 = np.abs(fft_1)
 
-frecuencias = np.arange(N//2) * delta_f
+frecuencias = np.arange(N) * delta_f
 
+#1 frecuencias = scipy.fft.fftfreq(N, 1/fs)     o frecuencias = np.fft.fftfreq(N, d=1/fs)
+
+#
 
 plt.figure(2)
 plt.plot(frecuencias,modulo_1)
@@ -106,6 +108,20 @@ plt.xlabel("frecuencia [Hz]")
 plt.grid()
 plt.axhline(0,color="black")
 plt.axvline(0,color="black",linewidth=1)
+
+modulo_1_norm =  modulo_1/N
+
+plt.figure(100)
+plt.plot(frecuencias,modulo_1_norm)
+plt.title("Modulo FFT normalizado de señal 1")
+plt.ylabel("|X[k]|")
+plt.xlabel("frecuencia [Hz]")
+plt.grid()
+plt.axhline(0,color="black")
+plt.axvline(0,color="black",linewidth=1)
+
+print("Modulo de la transformada en el bin 100: X[100]:", modulo_1_norm[100],"\nModulo de la transformada en el bin 900: X[900]:", modulo_1_norm[900])
+
 
 # %%
 #senial 2 de 2 watts desfasado np.pi/2
@@ -129,19 +145,72 @@ graficar_primer_ciclo(tt2, xx2, f0, 'Primer ciclo de Señal 2')
 #transformada de senial 2
 fft_2= scipy.fft.fft(xx2)
 
-modulo_2 = np.abs(fft_2[:N//2])
+modulo_2 = np.abs(fft_2)
 
-frecuencias2 = np.arange(N//2) * delta_f
+frecuencias2 = np.arange(N) * delta_f
 
+modulo_2_norm =  modulo_2/N
 
-plt.figure(4)
-plt.plot(frecuencias2,modulo_2)
-plt.title("Modulo FFT de señal 2")
+plt.figure(100)
+plt.plot(frecuencias,modulo_2_norm)
+plt.title("Modulo FFT normalizado de señal 2")
 plt.ylabel("|X[k]|")
 plt.xlabel("frecuencia [Hz]")
 plt.grid()
 plt.axhline(0,color="black")
 plt.axvline(0,color="black",linewidth=1)
+
+print("Modulo de la transformada en el bin 100: X[100]:", modulo_2_norm[100],"\nModulo de la transformada en el bin 900: X[900]:", modulo_2_norm[900])
+
+
+
+#%% diferencia de fase entre señal 1 y 2
+
+#1 fase de numero complejo: φ = atan2(Im(X[k]), Re(X[k]))
+
+# en python la libreria numpy, el comando np.angle(), hace: arctan2(imaginario, real)
+# y la sintaxis es _ np.angle(z, deg=False)
+
+
+
+# Como la fase donde |X[k]| ≈  o 0, no tiene relevancia, se realiza el analisis solo sobre los deltas. Esto se debe a que en las frecuencias donde no hay señal, la fft sigue devolviendo valores complejos de ordenes muy pequeños por error de imprecision de calculo computacional, por lo tanto, esta operacion devuelve valores aleatorios sin sentido., para ello se suele utilizar un umbral que sea superado por el modulo de la fft y analizar la fase solo en las frecuencias superadores de dicho umbral., En este caso, este paso no es necesario porque ya se las frecuencias en las que el espectro esta concentrado
+
+fase_1 = np.angle(fft_1)
+fase_2 = np.angle(fft_2)
+
+# los indices de la frec positiva y la frec negativa son: correspondientes a +2000 Hz y -2000 Hz son: 100 = 2000 Hz / 20 Hz y 900 = 18000 Hz / 20 Hz
+# Δf = 20 Hz:
+
+    
+# indice_pos= int(f0 / delta_f) #indice de frecuencia positiva = 100 +2000 Hz
+# indice_neg = N - indice_pos #indice de frecuencia negativa = 900 → 18000 Hz → -2000 Hz
+
+print("SEÑAL 1")
+print("Fase en +2000 Hz:", fase_1[100], "rad") #-π/2 rad
+print("Fase en -2000 Hz:", fase_1[900], "rad") #+π/2 rad
+print("\nSEÑAL 2")
+print("Fase en +2000 Hz:", fase_2[100], "rad")
+print("Fase en -2000 Hz:", fase_2[900], "rad")
+
+frecuencias_fase = [2000, 18000]
+fase_1i = [fase_1[100], fase_1[900]]
+fase_2i = [fase_2[100], fase_2[900]]
+
+plt.figure()
+plt.stem(frecuencias_fase, fase_1i)
+plt.title("Fase de las componentes principales - Señal 1")
+plt.xlabel("Frecuencia [Hz]")
+plt.ylabel("Fase [rad]")
+plt.grid()
+plt.show()
+
+plt.figure()
+plt.stem(frecuencias_fase, fase_2i)
+plt.title("Fase de las componentes principales - Señal 2")
+plt.xlabel("Frecuencia [Hz]")
+plt.ylabel("Fase [rad]")
+plt.grid()
+plt.show()
 
 # %% Senial 3: ruido de distribucion normal media = 0 y varianza = 0,1
 
@@ -157,15 +226,44 @@ plt.show()
 
 fft_ruido_normal = scipy.fft.fft(ruido_normal)
 
-modulo_ruido_normal = np.abs(fft_ruido_normal[:N//2])
+modulo_ruido_normal = np.abs(fft_ruido_normal)
 
-plt.figure(6)
-plt.plot(frecuencias, modulo_ruido_normal)
-plt.title("Modulo FFT de señal 3: Ruido normal")
-plt.xlabel("Frecuencia [Hz]")
+modulo_ruido_normal_normalizado =  modulo_ruido_normal/N
+
+plt.figure()
+plt.plot(frecuencias,modulo_ruido_normal_normalizado)
+plt.title("Modulo normalizado de FFT de señal 3: Ruido normal")
 plt.ylabel("|X[k]|")
+plt.xlabel("frecuencia [Hz]")
 plt.grid()
-plt.show()
+plt.axhline(0,color="black")
+plt.axvline(0,color="black",linewidth=1)
+
+
+# equivalentes> np.mean(ruido_normal**2)        y       np.sum(ruido_normal**2) / N
+
+
+#Chequeo Parseval, me deberia dar la misma potencia media
+
+
+#potencia media en dom temporal
+P_ruido_normal = np.sum(ruido_normal**2) / N
+print("Potencia media de Ruido normal en el dominio temporal:", P_ruido_normal)
+
+#potencia media en dom frecuencial
+P_ruido_normal_fft = np.sum(np.abs(fft_ruido_normal)**2) / N**2
+print("Potencia media del Ruido normal en el dominio frecuencial:", P_ruido_normal_fft)
+
+
+# Valor medio muestral E[X] = μ
+mu_normal = np.mean(ruido_normal)
+
+# Varianza mediante la formula: Var(X) = E[X²] - μ²
+var_normal_formula = P_ruido_normal - (mu_normal**2)
+
+print("Valor medio:", mu_normal )
+print("Varianza mediante la formula:", var_normal_formula)
+
 
 # %% Senial 4: ruido de distribucion uniforme media = 0 y varianza = 0,1
 
@@ -182,15 +280,22 @@ plt.show()
 
 fft_ruido_uniforme = scipy.fft.fft(ruido_uniforme)
 
-modulo_ruido_uniforme = np.abs(fft_ruido_uniforme[:N//2])
+modulo_ruido_uniforme = np.abs(fft_ruido_uniforme)
+
+modulo_ruido_uniforme_normalizado =  modulo_ruido_uniforme/N
+
 
 plt.figure(8)
-plt.plot(frecuencias, modulo_ruido_uniforme)
-plt.title("Modulo FFT de señal 4: Ruido uniforme")
+plt.plot(frecuencias, modulo_ruido_uniforme_normalizado)
+plt.title("Modulo normalizado de FFT de señal 4: Ruido uniforme")
 plt.xlabel("Frecuencia [Hz]")
 plt.ylabel("|X[k]|")
 plt.grid()
 plt.show()
+
+
+
+#
 
 # %% Señal 5: pulso rectangular
 
@@ -217,7 +322,7 @@ graficar_primer_ciclo(tt5, xx5, f0, 'Primer ciclo de Señal 5')
 # Transformada de señal 5
 fft_5 = scipy.fft.fft(xx5)
 
-modulo_5 = np.abs(fft_5[:N//2])
+modulo_5 = np.abs(fft_5)
 
 plt.figure(10)
 plt.plot(frecuencias, modulo_5)
@@ -227,16 +332,5 @@ plt.ylabel("|X[k]|")
 plt.grid()
 plt.show()
 
-# %% ANALISIS
-# P = E{x²}
-P1 = np.mean(xx**2)
-P2 = np.mean(xx2**2)
-P3 = np.mean(ruido_normal**2)
-P4 = np.mean(ruido_uniforme**2)
 P5 = np.mean(xx5**2)
-
-print("Potencia señal 1:", P1)
-print("Potencia señal 2:", P2)
-print("Potencia señal 3:", P3)
-print("Potencia señal 4:", P4)
 print("Potencia señal 5:", P5)
