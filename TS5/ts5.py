@@ -76,6 +76,17 @@ t_ecg = np.arange(len(ecg_one_lead)) / fs_ecg
 # con nperseg mas chico tengo mas bloques, entonces tengo menos varianza pero menor resulcion espectral.
 
 
+
+plt.figure()
+plt.title('Señal 1: Electrocardiograma')
+plt.grid()
+plt.plot(t_ecg, ecg_one_lead)
+plt.xlabel('Frecuencia [Hz]')
+plt.ylabel('Amplitud')
+plt.show()
+
+
+
 # Grafico para bloques de 1000, 2000, etc muestras
 nperseg_values = [1000,2000,8000]
 
@@ -85,6 +96,12 @@ for nperseg in nperseg_values:
 # UTLIZIZO VENTANA HANN 
     f_ecg, Pxx_ecg, bw_ecg = calcular_psd_y_bw(ecg_one_lead, fs_ecg, ventana = 'hann', nperseg = nperseg, porcentaje = 0.98)
     print(f'Ancho de banda de 98% potencia de ECG con bloques de {nperseg} muestras : {bw_ecg:.3f} Hz')
+    
+    
+    L = nperseg
+    var_teorica = (9 * L / (16 * len(ecg_one_lead))) * (np.mean(Pxx_ecg)**2)
+    print(f'Varianza teórica estimada del estimador: {var_teorica:.5f}\n')
+    
     Pxx_norm = Pxx_ecg / np.max(Pxx_ecg) # PSD en dB
     Pxx_db = 10 * np.log10(Pxx_norm)
     plt.figure(figsize=(10, 4))
@@ -188,6 +205,57 @@ for nperseg1 in nperseg_values_ppg:
 
 # %% ##################################### Lectura audios#####################################
 
+def calcular_psd_y_bw(x, fs, ventana, nperseg, porcentaje):
+
+    f, Pxx = signal.welch(
+        x,
+        fs=fs,
+        window=ventana,
+        nperseg=nperseg,
+        noverlap=nperseg // 2,
+        nfft=None,
+        detrend='constant',
+        return_onesided=True,
+        scaling='density',
+        axis=-1,
+        average='mean'
+    )
+
+    df = f[1] - f[0]
+
+    # Cálculo de la potencia acumulada
+    potencia_acum = np.cumsum(Pxx) * df
+    potencia_total = potencia_acum[-1]
+
+    # Porcentaje de potencia que queda fuera del intervalo
+    porcentaje_fuera = 1 - porcentaje
+
+    # Se distribuye el porcentaje fuera del intervalo
+    # en partes iguales entre las frecuencias mínima y máxima
+    porcentaje_min = porcentaje_fuera / 2
+    porcentaje_max = 1 - porcentaje_fuera / 2
+
+    # Frecuencia mínima que delimita el intervalo de potencia
+    indice_min = np.where(
+        potencia_acum >= porcentaje_min * potencia_total
+    )[0][0]
+
+    f_min = f[indice_min]
+
+    # Frecuencia máxima que delimita el intervalo de potencia
+    indice_max = np.where(
+        potencia_acum >= porcentaje_max * potencia_total
+    )[0][0]
+
+    f_max = f[indice_max]
+
+    # Ancho del intervalo de frecuencias que contiene
+    # el porcentaje de potencia especificado
+    bw = f_max - f_min
+
+    return f, Pxx, f_min, f_max, bw
+# %% 
+
 fs_audio, audio1 = sio.wavfile.read('la cucaracha.wav')
 fs_audio, audio2  = sio.wavfile.read('prueba psd.wav')
 fs_audio, audio3 = sio.wavfile.read('silbido.wav')
@@ -212,23 +280,22 @@ plt.show()
 nperseg_values_audio1 = [1000, 24000, 48000]
     
 for nperseg_audio1 in nperseg_values_audio1:
-# UTLIZIZO VENTANA HANN
-    f_audio1, Pxx_audio1, bw_audio1 = calcular_psd_y_bw(audio1, fs_audio, ventana = 'hann', nperseg =  nperseg_audio1 , porcentaje = 0.98)
-    print(f'Ancho de banda de 98% potencia de ECG con bloques de {nperseg_audio1} muestras : {bw_audio1:.3f} Hz')
+    f_audio1, Pxx_audio1, f_min_1, f_max_1, bw_audio1 = calcular_psd_y_bw(
+        audio1, fs_audio, ventana='hann', nperseg=nperseg_audio1, porcentaje=0.98
+    )
+    print(f'Audio 1 - nperseg={nperseg_audio1}: BW98 = {bw_audio1:} Hz (Desde {f_min_1:} Hz hasta {f_max_1:} Hz)')
 
-    Pxx__audio1_norm = Pxx_audio1 / np.max(Pxx_audio1)
-    # PSD en dB
-    Pxx_audio1_db = 10 * np.log10(Pxx__audio1_norm)
-
+    Pxx_audio1_norm = Pxx_audio1 / np.max(Pxx_audio1)
+    Pxx_audio1_db = 10 * np.log10(Pxx_audio1_norm)
 
     plt.figure(figsize=(10, 4))
     plt.plot(f_audio1, Pxx_audio1_db)
     plt.xlim(0, 3000)
-    # plt.xticks(np.arange(0, 35, 1), rotation=90)
     plt.xlabel('Frecuencia [Hz]')
-    plt.axvline(bw_audio1, color='black', linestyle='dashed', linewidth=2, label='98% ancho de banda')
     plt.ylabel('PSD [dB]')
-    plt.title(f'PSD Audio 1: "La cucaracha" - Welch - bloques de {nperseg_audio1} muestras (Δf ≈ {fs_audio/nperseg_audio1:.3f} Hz)')
+    plt.axvline(f_min_1, color='red', linestyle='dashed', linewidth=1.5, label=f'f_min ({f_min_1} Hz)')
+    plt.axvline(f_max_1, color='black', linestyle='dashed', linewidth=1.5, label=f'f_max ({f_max_1} Hz)')
+    plt.title(f'PSD Audio 1: "La cucaracha" - Welch - bloques de {nperseg_audio1} muestras (Δf ≈ {fs_audio/nperseg_audio1} Hz)')
     plt.grid()
     plt.legend(loc='upper right')
     plt.show()
@@ -240,7 +307,7 @@ N_audio2 = len(audio2)
 t_audio2 = np.arange(N_audio2) / fs_audio
 
 print(f'Audio 2 - Cantidad de muestras: {N_audio2}')
-print(f'Audio 2 - Duración: {N_audio2/fs_audio:.2f} s')
+print(f'Audio 2 - Duración: {N_audio2/fs_audio} s')
 
 
 # Señal temporal
@@ -248,7 +315,7 @@ plt.figure(figsize=(12, 4))
 plt.plot(t_audio2, audio2)
 
 plt.xlabel('Tiempo [s]')
-plt.ylabel('Amplitud [u.a.]')
+plt.ylabel('Amplitud')
 plt.title('Señal Audio 2: Prueba PSD')
 plt.grid()
 plt.show()
@@ -256,53 +323,39 @@ plt.show()
 
 nperseg_values_audio2 = [1000, 24000, 48000]
 
-for nperseg_audio2 in nperseg_values_audio2:
+nperseg_values_audio2 = [1000, 24000, 48000]
 
-    f_audio2, Pxx_audio2, bw_audio2 = calcular_psd_y_bw(
-        audio2,
-        fs_audio,
-        ventana='hann',
-        nperseg=nperseg_audio2,
-        porcentaje=0.98
+for nperseg_audio2 in nperseg_values_audio2:
+    f_audio2, Pxx_audio2, f_min_2, f_max_2, bw_audio2 = calcular_psd_y_bw(
+        audio2, fs_audio, ventana='hann', nperseg=nperseg_audio2, porcentaje=0.98
     )
 
     print(
         f'Audio 2 - nperseg={nperseg_audio2}: '
         f'Δf ≈ {fs_audio/nperseg_audio2:.3f} Hz, '
-        f'BW98 = {bw_audio2:.3f} Hz'
+        f'BW98 = {bw_audio2:.3f} Hz (Desde {f_min_2:.1f} Hz hasta {f_max_2} Hz)'
     )
 
     Pxx_audio2_norm = Pxx_audio2 / np.max(Pxx_audio2)
-
-    # PSD en dB
     Pxx_audio2_db = 10 * np.log10(Pxx_audio2_norm)
 
     plt.figure(figsize=(10, 4))
     plt.plot(f_audio2, Pxx_audio2_db)
-
     plt.xlim(0, 3000)
-
     plt.xlabel('Frecuencia [Hz]')
     plt.ylabel('PSD [dB]')
-
-    plt.axvline(
-        bw_audio2,
-        color='black',
-        linestyle='dashed',
-        linewidth=2,
-        label='98% ancho de banda'
-    )
-
+    plt.axvline(f_min_2, color='red', linestyle='dashed', linewidth=1.5, label=f'f_min ({f_min_2} Hz)')
+    plt.axvline(f_max_2, color='black', linestyle='dashed', linewidth=1.5, label=f'f_max ({f_max_2} Hz)')
     plt.title(
         f'PSD Audio 2: "Prueba PSD" - Welch - '
         f'nperseg={nperseg_audio2} '
-        f'(Δf ≈ {fs_audio/nperseg_audio2:.3f} Hz)'
+        f'(Δf ≈ {fs_audio/nperseg_audio2} Hz)'
     )
-
     plt.grid()
     plt.legend(loc='upper right')
     plt.show()
     
+sd.play(audio2, fs_audio)
 
 # %% audio 3
 
@@ -314,7 +367,7 @@ plt.plot(t_audio3, audio3)
 
 plt.xlabel('Tiempo [s]')
 plt.ylabel('Amplitud')
-plt.title('Señal Audio 1: La cucaracha')
+plt.title('Señal Audio 3: Silbido')
 plt.grid()
 plt.show()
 
@@ -325,46 +378,43 @@ plt.show()
 nperseg_values_audio3 = [1000, 24000, 48000]
 
 for nperseg_audio3 in nperseg_values_audio3:
-
-    f_audio3, Pxx_audio3, bw_audio3 = calcular_psd_y_bw(audio3, fs_audio, ventana='hann', nperseg=nperseg_audio3, porcentaje=0.98)
+    f_audio3, Pxx_audio3, f_min_3, f_max_3, bw_audio3 = calcular_psd_y_bw(
+        audio3, fs_audio, ventana='hann', nperseg=nperseg_audio3, porcentaje=0.98
+    )
 
     print(
         f'Audio 3 - nperseg={nperseg_audio3}: '
-        f'Δf ≈ {fs_audio/nperseg_audio3:.3f} Hz, '
-        f'BW98 = {bw_audio3:.3f} Hz'
+        f'Δf ≈ {fs_audio/nperseg_audio3:} Hz, '
+        f'BW98 = {bw_audio3} Hz (Desde {f_min_3} Hz hasta {f_max_3} Hz)'
     )
 
     Pxx_audio3_norm = Pxx_audio3 / np.max(Pxx_audio3)
-
-    # PSD en dB
     Pxx_audio3_db = 10 * np.log10(Pxx_audio3_norm)
 
     plt.figure(figsize=(10, 4))
     plt.plot(f_audio3, Pxx_audio3_db)
-
-    # plt.xlim(0, 3000)
-
     plt.xlabel('Frecuencia [Hz]')
     plt.ylabel('PSD [dB]')
-    plt.xlim(0,8000)
-    plt.axvline(
-        bw_audio3,
-        color='black',
-        linestyle='dashed',
-        linewidth=2,
-        label='98% ancho de banda'
-    )
-
+    plt.xlim(0, 8000)
+    plt.axvline(f_min_3, color='red', linestyle='dashed', linewidth=1.5, label=f'f_min ({f_min_3} Hz)')
+    plt.axvline(f_max_3, color='black', linestyle='dashed', linewidth=1.5, label=f'f_max ({f_max_3} Hz)')
     plt.title(
         f'PSD Audio 3: "Silbido" - Welch - '
         f'nperseg={nperseg_audio3} '
-        f'(Δf ≈ {fs_audio/nperseg_audio3:.3f} Hz)'
+        f'(Δf ≈ {fs_audio/nperseg_audio3:} Hz)'
     )
-
     plt.grid()
     plt.legend(loc='upper right')
     plt.show()
     
+# %%
+print("--- Resumen de Anchos de Banda (98% de Potencia) ---")
+
+print(f"Señal 1 - ECG (6 bloques de L =8000): {bw_ecg:.2f} Hz")
+print(f"Señal 2 - PPG (bloques de L = 3200): {bw_ppg:.2f} Hz")
+print(f"Señal 3 - Audio 1 'La cucaracha' (L = 48000): desde {f_min_1:.1f} Hz hasta {f_max_1:.1f} Hz -> Ancho de Banda = {bw_audio1:.2f} Hz")
+print(f"Señal 4 - Audio 2 'Prueba PSD' (L = 48000): desde {f_min_2:.1f} Hz hasta {f_max_2:.1f} Hz ->  Ancho de Banda = {bw_audio2:.2f} Hz")
+print(f"Señal 5 - Audio 3 'Silbido' (L = 48000): desde {f_min_3:.1f} Hz hasta {f_max_3:.1f} Hz ->  Ancho de Banda = {bw_audio3:.2f} Hz")
 # graficar audios
 # plt.figure()
 # plt.plot(wav_data1)
@@ -372,7 +422,7 @@ for nperseg_audio3 in nperseg_values_audio3:
 # plt.plot(wav_data3)
 
 # escuchar audio:
-#sd.play(wav_data1, fs_audio)
+# sd.play(wav_data1, fs_audio)
 
 
 # w_blackmanharris = win.blackmanharris(N) # .reshape(N, 1)
